@@ -9,12 +9,13 @@ public class TollRoadMain {
         System.out.println(simulateFromFile(mainTollRoad));
     }
 
+    public enum DiscountType {FRIENDS_AND_FAMILY, STAFF, NONE}
+    public enum VehicleType {Car, Van, Truck}
+
     static TollRoad initialiseTollRoadFromFile(){
         TollRoad tollRoad = new TollRoad();
 
-        try {
-            File customerData = new File("customerData.txt");
-            Scanner fileLineScanner = new Scanner(customerData);
+        try(Scanner fileLineScanner = new Scanner(new File("customerData.txt"))) {
             ArrayList<String> inputData = new ArrayList<>();
 
             fileLineScanner.useDelimiter("#");
@@ -25,7 +26,7 @@ public class TollRoadMain {
                 //System.out.println(customerInformationBuffer);
 
                 Scanner customerDataScanner =
-                                        new Scanner(customerInformationBuffer);
+                        new Scanner(customerInformationBuffer);
                 customerDataScanner.useDelimiter(",");
 
                 while (customerDataScanner.hasNext()) {
@@ -36,19 +37,23 @@ public class TollRoadMain {
                 String vehicleType = inputData.get(0);
                 Vehicle tempVehicle = null;
 
-                if (vehicleType.compareTo("Car") == 0)
+                switch (VehicleType.valueOf(vehicleType))
                 {
-                    tempVehicle = new Car(inputData.get(1), inputData.get(4),
-                            Integer.parseInt(inputData.get(5)));
+                    case Car:
+                        tempVehicle = new Car(inputData.get(1), inputData.get(4),
+                                Integer.parseInt(inputData.get(5)));
+                        break;
+                    case Van:
+                        tempVehicle = new Van(inputData.get(1), inputData.get(4),
+                                Integer.parseInt(inputData.get(5)));
+                        break;
+                    case Truck:
+                        tempVehicle = new Truck(inputData.get(1), inputData.get(4),
+                                Integer.parseInt(inputData.get(5)));
+                        break;
+                    default:
+                        break;
 
-                } else if (vehicleType.compareTo("Van") == 0)
-                {
-                    tempVehicle = new Van(inputData.get(1), inputData.get(4),
-                            Integer.parseInt(inputData.get(5)));
-                }else
-                {
-                    tempVehicle = new Truck(inputData.get(1), inputData.get(4),
-                            Integer.parseInt(inputData.get(5)));
                 }
 
                 CustomerAccount tempCustomerAccount =
@@ -72,14 +77,32 @@ public class TollRoadMain {
     public static void checkDiscount(String discountValue,
                                      CustomerAccount customerAccount)
     {
-        if(discountValue.compareTo("FRIENDS_AND_FAMILY") == 0)
+
+        switch (DiscountType.valueOf(discountValue))
         {
-            customerAccount.activateFriendsAndFamilyDiscount(); 
-        } else if (discountValue.compareTo("STAFF") == 0)
-        {
-            customerAccount.activateStaffDiscount();
+            case STAFF:
+                customerAccount.activateStaffDiscount();
+                break;
+            case FRIENDS_AND_FAMILY:
+                customerAccount.activateFriendsAndFamilyDiscount();
+                break;
+            case NONE:
+                break;
         }
     }
+    // Changing String to enum for maintainability and readability
+    public static DiscountType getDiscountType(String discountValue)
+    {
+        switch (discountValue.toUpperCase())
+        {
+            case "FRIENDS_AND_FAMILY":
+                return DiscountType.FRIENDS_AND_FAMILY;
+            case "STAFF":
+                return DiscountType.STAFF;
+        }
+        return null;
+    }
+
 
     static int simulateFromFile(TollRoad road) throws FileNotFoundException {
 
@@ -87,61 +110,59 @@ public class TollRoadMain {
         Scanner transactionLineScanner = new Scanner(transactions);
         transactionLineScanner.useDelimiter("\\$");
 
-        String transactionInformation;
+
         ArrayList<String> transactionTemp = new ArrayList<>();
 
         while(transactionLineScanner.hasNext())
         {
-            transactionInformation = transactionLineScanner.next();
-            //System.out.println(transactionInformationBuffer);
+            String transactionInformation = transactionLineScanner.next();
 
             Scanner transactionScanner = new Scanner(transactionInformation);
             transactionScanner.useDelimiter(",");
-            while(transactionScanner.hasNext())
+            String transactionType = transactionScanner.next();
+
+
+
+            switch (TransactionType.valueOf(transactionType))
             {
-                transactionTemp.add(transactionScanner.next());
+                case addFunds:
+                    String regNum = transactionScanner.next();
+                    int amount = Integer.parseInt(transactionScanner.next());
+                    try
+                    {
+                        CustomerAccount currentCustomerAccount
+                                = road.findCustomer(regNum);
+                        currentCustomerAccount.addFunds(amount);
+                        System.out.println(regNum + ": " + amount
+                                + " added successfully");
+                    }catch (NullPointerException e)
+                    {
+                        System.out.println(regNum + ": addFunds failed. " +
+                                "CustomerAccount does not exist");
+                    }
+                    break;
 
-            }
-
-            //System.out.println(transactionTemp.toString());
-
-
-            String transactionType = transactionTemp.get(0);
-            String regNum = transactionTemp.get(1);
-            CustomerAccount currentCustomerAccount;
-            if(transactionType.compareTo("addFunds") == 0)
-            {
-                try {
-                    int amount = Integer.parseInt(transactionTemp.get(2));
-                    currentCustomerAccount = road.findCustomer(regNum);
-                    currentCustomerAccount.addFunds(amount);
-                    System.out.println(regNum + ": " + amount
-                            + " added successfully");
-                }catch (NullPointerException e)
-                {
-                    System.out.println(regNum + ": addFunds failed. " +
-                                        "CustomerAccount does not exist");
-                }
-
-
-            }
-            if(transactionType.compareTo("makeTrip") == 0)
-            {
-                try {
-                    road.chargeCustomer(regNum);
-
-                    System.out.println(regNum + " Trip completed successfully");
-                }catch (InsufficientAccountBalanceException e) {
-                    System.out.println(regNum + " makeTrip failed. " +
-                                                "Insufficient funds");
-                }catch(NullPointerException e) {
-                    System.out.println(regNum + ": makeTrip failed. " +
-                            "CustomerAccount does not exist");
-                }
+                case makeTrip:
+                    regNum = transactionScanner.next();
+                    try
+                    {
+                        road.chargeCustomer(regNum);
+                        System.out.println(regNum
+                                + " Trip completed successfully");
+                    } catch (InsufficientAccountBalanceException e) {
+                        System.out.println(regNum +
+                                " makeTrip failed. Insufficient funds");
+                    } catch (NullPointerException e) {
+                        System.out.println(regNum + ": makeTrip failed. " +
+                                "CustomerAccount does not exist");
+                    }
+                    break;
             }
 
             transactionTemp.clear();
         }
         return road.getMoneyMade();
     }
+
+    enum TransactionType {addFunds, makeTrip}
 }
